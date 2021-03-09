@@ -5,27 +5,6 @@ import serial
 import argparse
 from threading import Thread
 
-class VideoStreamThreading():
-    def __init__(self):
-        self.cap = cv2.VideoCapture(0)
-        self.thread = Thread(target=self.update_frame, args=())
-        self.thread.daemon = True
-        self.thread.start()
-
-    def update_frame(self):
-        # Reads the next frame from the webcam in a seperate thread
-        while 1:
-            if self.cap.isOpened():
-                (self.status, self.frame) = self.cap.read()
-            sleep(.01)
-
-    def display_frame(self):
-        cv2.imshow('image', self.frame)
-        if cv2.waitKey(1) == ord('q'):
-            self.cap.release()
-            cv2.destroyAllWindows()
-            exit(1)
-
 class Face_Seg():
     def __init__(self, mode):
         self.mode = mode.strip()
