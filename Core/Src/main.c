@@ -224,7 +224,6 @@ int main(void)
   int TX_num_packets = 0;
   int TX_finished = 1;
   int NN_finished = 0;
-  long error = 0;
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
 
   /* 3 - Post-process the predictions */
@@ -247,9 +246,12 @@ int main(void)
 		  memcpy(in_data, data, 64*64*sizeof(float));
 		  //  /* 2 - Call inference engine */
 		  aiRun(in_data, out_data);
+		  // 64 x 64 / 8 = 64 x 8
 		  for(int i=0; i<64; i++) {
 			  for(int j=0; j<64; j++) {
-				  image[64*i + j] = out_data[(64*i + j) << 1] < 0.5;
+				  if(!(j%8))
+					  image[((i<<6)+j)>>3] = 0;
+				  image[((i<<6)+j)>>3] = image[((i<<6)+j)>>3] | ((out_data[((i<<6)+j)<<1] < 0.5) << (j%8));
 			  }
 		  }
 		  NN_finished = 1;
@@ -258,10 +260,14 @@ int main(void)
 	  if(RX_num_packets == X_LEN*Y_LEN/64 && NN_finished) {
 		  TX_finished = 0;
 		  if(hcdc->TxState == USBD_OK) {
+//			  if(CDC_Transmit_FS(image + TX_num_packets*64, 64) == USBD_OK)
+			  // Using the new encoding scheme of 64*64/8 bytes transfered
 			  if(CDC_Transmit_FS(image + TX_num_packets*64, 64) == USBD_OK)
 				  TX_num_packets++;
 		  }
-		  if(TX_num_packets == X_LEN*Y_LEN/64) {
+//		  if(TX_num_packets == X_LEN*Y_LEN/64) {
+		  // Using the new encodig scheme with 64*64/8 bytes transferred
+		  if(TX_num_packets == 64*64/(64*8)) {
 			  RX_num_packets = 0;
 			  TX_num_packets = 0;
 			  TX_finished = 1;
