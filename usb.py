@@ -22,12 +22,6 @@ class Face_Seg():
             (self.status, self.frame) = self.cap.read()
             sleep(.01) 
 
-    def display_frame(self):
-        cv2.imshow('image', self.frame)
-        if cv2.waitKey(1) == ord('q'):
-            self.cap.release()
-            cv2.destroyAllWindows()
-
     def main_loop(self):
         x_len, y_len = 64, 64
         
