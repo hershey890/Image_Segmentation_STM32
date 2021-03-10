@@ -35,6 +35,7 @@ class Face_Seg():
             ind_y1, ind_y2 = x_len_webcam//2 - y_len_webcam//2, x_len_webcam//2 + y_len_webcam//2
             background_img_raw = cv2.imread(self.background_path, cv2.IMREAD_COLOR)
             if background_img_raw is None: raise(IOError('Background Image Error - probably Not Found'))
+            if background_img_raw.shape[0] < 128 or background_img_raw.shape[1] < 128: raise(IOError('Background Image must have dimensions >= 128x128'))
             if background_img_raw.shape[0] != background_img_raw.shape[1]:
                 if background_img_raw.shape[0] > background_img_raw.shape[1]:
                     background_img = background_img_raw[:background_img_raw.shape[1],:]
