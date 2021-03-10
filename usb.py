@@ -6,10 +6,11 @@ import argparse
 from threading import Thread
 
 class Face_Seg():
-    def __init__(self, mode):
+    def __init__(self, mode, background_path):
         self.mode = mode.strip()
         # Webcam runs in a seperate thread
         if self.mode == 'webcam':
+            self.background_path = background_path
             self.cap = cv2.VideoCapture(0)
             while not self.cap.isOpened: pass
             self.thread = Thread(target=self._update_frame, args=())
@@ -32,9 +33,15 @@ class Face_Seg():
         if self.mode == 'webcam':
             x_len_webcam, y_len_webcam = int(self.cap.get(3)), int(self.cap.get(4))
             ind_y1, ind_y2 = x_len_webcam//2 - y_len_webcam//2, x_len_webcam//2 + y_len_webcam//2
-            background_img = cv2.imread('royce.png', cv2.IMREAD_COLOR)
-            # background_img = cv2.imread('tiger_king_big.png', cv2.IMREAD_COLOR)
-            if background_img is None: raise(IOError('Input Image Error'))
+            background_img_raw = cv2.imread(self.background_path, cv2.IMREAD_COLOR)
+            if background_img_raw is None: raise(IOError('Background Image Error - probably Not Found'))
+            if background_img_raw.shape[0] != background_img_raw.shape[1]:
+                if background_img_raw.shape[0] > background_img_raw.shape[1]:
+                    background_img = background_img_raw[:background_img_raw.shape[1],:]
+                else:
+                    background_img = background_img_raw[:,:background_img_raw.shape[0],:]
+            else:
+                background_img = background_img_raw           
 
         # Import dataset
         elif self.mode == 'dataset':
@@ -62,7 +69,7 @@ class Face_Seg():
         if self.mode == 'webcam':
             if background_img.shape[0] != 128:
                 cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-                cv2.resizeWindow('image', 640*2,480*2)
+                cv2.resizeWindow('image', 600,600)
 
         RxTx_len = 64
         Tx_num_packets = x_len * y_len // RxTx_len
@@ -97,14 +104,7 @@ class Face_Seg():
                 frame = self.frame
                 frame_crop = frame[:,ind_y1:ind_y2,:]
                 out = cv2.resize(frame_crop, (128,128))
-                if background_img.shape[0] == 128 and background_img.shape[1] == 128:
-                    display_img = background_img - background_img * mask + mask * out
-                else:
-                    if new_mask_ready:
-                        mask = cv2.resize(mask, (400, 400)) #640, 480
-                        mask = cv2.copyMakeBorder(mask, 80, 0, 120, 120, borderType=cv2.BORDER_CONSTANT, value=0)
-                        new_mask_ready = False                    
-                    display_img = background_img - background_img * mask + mask * frame
+                display_img = background_img - background_img * mask + mask * cv2.resize(frame_crop, (background_img.shape[0], background_img.shape[1]))
                 cv2.imshow('image', display_img)
                 if cv2.waitKey(1) == ord('q'):
                     self.cap.release()
@@ -134,19 +134,18 @@ class Face_Seg():
                     Rx_buff[num_packets_received*8*RxTx_len + 8*i + 5] = (Rx_word[i] & 0b00100000) >> 5
                     Rx_buff[num_packets_received*8*RxTx_len + 8*i + 6] = (Rx_word[i] & 0b01000000) >> 6
                     Rx_buff[num_packets_received*8*RxTx_len + 8*i + 7] = (Rx_word[i] & 0b10000000) >> 7
-
                 num_packets_received += 1
 
                 # Is the message is fully received from the MCU
                 if num_packets_received == Rx_num_packets:
                     raw_map = Rx_buff.reshape((x_len,y_len))
-                    raw_map = cv2.resize(raw_map, (x_len*2, y_len*2))
-
+                    
                     if self.mode == 'webcam':
+                        raw_map = cv2.resize(raw_map, (background_img.shape[0], background_img.shape[1]))
                         mask = np.dstack([raw_map, raw_map, raw_map])
-                        new_mask_ready = True
 
                     elif self.mode == 'dataset':
+                        raw_map = cv2.resize(raw_map, (x_len*2, y_len*2))
                         mask = np.dstack([raw_map*0, raw_map*0, raw_map*255])
                         display_img = np.flip(images_rgb[counter], 2)
                         display_img = cv2.addWeighted(display_img, 0.7, mask, 0.3, 0)
@@ -165,7 +164,8 @@ class Face_Seg():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--mode', type=str)
+    parser.add_argument('-b', '--background_path', default='royce.png', type=str)
     args = parser.parse_args()
     
-    face_seg = Face_Seg(mode=args.mode)
+    face_seg = Face_Seg(mode=args.mode, background_path=args.background_path)
     face_seg.main_loop()
